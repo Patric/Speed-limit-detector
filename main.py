@@ -12,10 +12,10 @@ if cap is not False:
     frame = cap.read()
     pause = False
     detector = roadLimitDetector(cap.read()[1])
-    detector.createTrackbars("Parameters")
+    #detector.showFAWTrackbars()
   
     while(cap.isOpened()): 
-        d = detector.getTrackbarValues()
+        d = detector.getFAWTrackbarValues()
 
         if keyboard.is_pressed("d"):
             pause = True
@@ -32,7 +32,7 @@ if cap is not False:
         #feature extraction
         only_red = detector.rMask(processed_frame)
         detected_circles = detector.houghCircles(only_red)
-        detector.markFrames(detected_circles)
+        detector.cutSuspect(detected_circles)
         detector.showFrames()
        
         if cv2.waitKey(d['Delay']) & 0xFF == ord('q'):
