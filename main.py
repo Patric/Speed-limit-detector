@@ -2,13 +2,8 @@ from video import *
 from roadLimitDetector import *
 import keyboard
 import imutils
-from shapedetector import *
 
 
-
-
-def callback(foo):
-    pass
 
 cap = video("resource.mp4").capture()
 
