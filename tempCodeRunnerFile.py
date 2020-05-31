@@ -1,0 +1,1 @@
+# red_mask3 = cv2.bitwise_not(red_mask3)#inversion for hough
