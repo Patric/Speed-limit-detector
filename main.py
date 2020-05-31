@@ -1,5 +1,5 @@
 from video import *
-from roadLimitDetector import *
+from analyser import *
 import keyboard
 import imutils
 
@@ -11,11 +11,11 @@ cap = video("resource.mp4").capture()
 if cap is not False:
     frame = cap.read()
     pause = False
-    detector = roadLimitDetector(cap.read()[1])
-    #detector.showFAWTrackbars()
+    analyser = analyser(cap.read()[1])
+    #analyser.showFAWTrackbars()
   
     while(cap.isOpened()): 
-        d = detector.getFAWTrackbarValues()
+        d = analyser.getFAWTrackbarValues()
 
         if keyboard.is_pressed("d"):
             pause = True
@@ -27,13 +27,13 @@ if cap is not False:
             pass
         else:
             ret, frame = cap.read()
-            processed_frame = detector.preprocessing(frame)
+            processed_frame = analyser.preprocessing(frame)
 
         #feature extraction
-        only_red = detector.rMask(processed_frame)
-        detected_circles = detector.houghCircles(only_red)
-        detector.cutSuspect(detected_circles)
-        detector.showFrames()
+        only_red = analyser.rMask(processed_frame)
+        detected_circles = analyser.houghCircles(only_red)
+        analyser.cutSuspect(detected_circles)
+        analyser.showFrames()
        
         if cv2.waitKey(d['Delay']) & 0xFF == ord('q'):
             break

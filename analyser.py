@@ -4,7 +4,7 @@ def callback(foo):
         pass
 
 
-class roadLimitDetector:
+class analyser:
     scale = 50
     width = 0
     height = 0
