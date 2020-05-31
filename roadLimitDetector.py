@@ -8,7 +8,7 @@ class roadLimitDetector:
     scale = 50
     width = 0
     height = 0
-    preprocessing_settings = 0
+    processing_settings = 0
     window_name = "Not set"
     suspect = 0
 
@@ -23,7 +23,7 @@ class roadLimitDetector:
         self.width = int(frame.shape[1] * scale / 100)
         self.height = int(frame.shape[0] * scale / 100)
         #'Settting name' : (default value, range in trackbar)
-        self.preprocessing_settings = {
+        self.processing_settings = {
             'Gaussian kernel size': (6, 50),
             'Delay': (1, 100),
             'H min': (0, 180),
@@ -61,13 +61,13 @@ class roadLimitDetector:
     def createTrackbars(self, window_name):
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
         self.window_name = window_name
-        for key in self.preprocessing_settings:
-            cv2.createTrackbar(key, self.window_name, self.preprocessing_settings[key][0], self.preprocessing_settings[key][1], callback)
+        for key in self.processing_settings:
+            cv2.createTrackbar(key, self.window_name, self.processing_settings[key][0], self.processing_settings[key][1], callback)
 
 
     def getTrackbarValues(self):
         d = dict()
-        for key in self.preprocessing_settings:
+        for key in self.processing_settings:
             d.update( { key : int(cv2.getTrackbarPos(key, self.window_name)) } )
         #d['Gaussian kernel size'] = d['Gaussian kernel size']* 2 + 1
         d['dp for hough'] = d['dp for hough'] / 10
@@ -83,7 +83,7 @@ class roadLimitDetector:
         self.BGR_frame = self.resizeFrame(frame, self.scale)
         frame_hsv = cv2.cvtColor(self.BGR_frame, cv2.COLOR_BGR2HSV)
         #eliminating high frequency noise
-        frame_hsv = cv2.GaussianBlur(frame_hsv, (self.preprocessing_settings['Gaussian kernel size'][0]*2+1, self.preprocessing_settings['Gaussian kernel size'][0]*2+1), 0)
+        frame_hsv = cv2.GaussianBlur(frame_hsv, (self.processing_settings['Gaussian kernel size'][0]*2+1, self.processing_settings['Gaussian kernel size'][0]*2+1), 0)
         return frame_hsv
 
     #Used to get settings e.g to write to a file - for later
@@ -134,7 +134,7 @@ class roadLimitDetector:
                 if(suspect.shape[0] > 40 and suspect.shape[1] > 40):
                     suspect = cv2.resize(suspect, (suspect.shape[0]*5,suspect.shape[1]*5))
                     self.suspect = suspect
-                    cv2.imshow('suspect', suspect)#for debug
+                    cv2.imshow('suspect', suspect)
 
                 #Draw on redmask
                 cv2.circle(self.rmask_clean, (x, y), r, (0, 255, 0), 2)
