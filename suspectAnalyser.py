@@ -1,5 +1,6 @@
 from analyser import *
 import imutils
+from datetime import datetime
 
 def callback(foo):
         pass
@@ -10,7 +11,7 @@ class suspectAnalyser:
     settings = list()
     width = 0
     height = 0
-
+    cntr = 0
 
     def __init__(self):
         d = {
@@ -31,6 +32,7 @@ class suspectAnalyser:
             'close kernel': (5, 100),
             'open i': (10, 60),
             'close i': (10, 60),
+            'Cnt thresh' : (1240, 10000),
         }
         get_inner_settings = {"GI settings" : d}
         self.settings.append(get_inner_settings)
@@ -54,49 +56,53 @@ class suspectAnalyser:
                     return d
                 except Exception as e:
                     for key in setting.get(setting_to_use):
-                        d.update( { key : setting.get(setting_to_use)[0] } )
+                        d.update( { key : setting.get(setting_to_use)[key][0] } )
                     return d
+
+    def generateDataSet(self, data):
+        cv2.imwrite(f'suspects/suspect_{self.cntr}.jpg', data) 
+        self.cntr += 1
 
 
     def getInner(self, suspect_bin, suspect_bgr):
-        cnts = cv2.findContours(suspect_bin.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
-      
+        
         d = self.getTrackbarValues("GI settings")
-
         suspect_bgr = cv2.addWeighted(suspect_bgr, d['contrast']*0.001, suspect_bgr, d['brightness'] *0.001, d['gamma']-100)
-
         suspect_hsv = cv2.cvtColor(suspect_bgr, cv2.COLOR_BGR2HSV)
         #eliminating high frequency noise
         suspect_hsv = cv2.GaussianBlur(suspect_hsv, (d['Gaussian kernel size']*2+1, d['Gaussian kernel size']*2+1), 0)
         cut_black = cv2.inRange(suspect_hsv, (d['H min'], d['S min'], d['V min']), (d['H max'], d['S max'] ,d['V max']))
-        #in_range_2 = cv2.inRange(suspect_hsv, (d['H2 min'], d['S2 min'], d['V2 min']), (d['H2 max'], d['S2 max'] ,d['V2 max']))
-        #ranges_combined = cv2.bitwise_or(in_range_1, in_range_2)
         bmask = cv2.bitwise_and(suspect_bgr, suspect_bgr, mask = cut_black)
         bmask = cv2.cvtColor(bmask, cv2.COLOR_BGR2GRAY)
         threshold = cv2.adaptiveThreshold(bmask, maxValue = d['t max value'], adaptiveMethod = cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresholdType = cv2.THRESH_BINARY, blockSize = d['bsize']*2 + 1, C = d['C'] - 25)
         opened = cv2.morphologyEx(threshold, cv2.MORPH_OPEN, (d['open kernel'], d['open kernel']), iterations=d['open i'])
         closed = cv2.morphologyEx(opened, cv2.MORPH_CLOSE, (d['close kernel'], d['close kernel']), iterations=d['close i'])
     
-        # stencil = np.zeros(suspect_bin.shape).astype(suspect_bin.dtype)
-        # cv2.fillPoly(stencil, cnts, [111,111,111])
-     
-        # result = cv2.bitwise_and(suspect_bin, stencil)
-        # cv2.imshow("result", result)
         
-        # loop over the contours
+        cnts = cv2.findContours(closed.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+
+        view = closed
+    
+        #loop over the contours
         for c in cnts:
             # compute the center of the contour
-            M = cv2.moments(c)
-            cX = int(M["m10"] / M["m00"])
-            cY = int(M["m01"] / M["m00"])
-            # draw the contour and center of the shape on the image
-            cv2.drawContours(suspect_hsv, [c], -1, (0, 255, 0), 2)
-            cv2.circle(suspect_hsv, (cX, cY), 7, (255, 255, 255), -1)
-            cv2.putText(suspect_hsv, f"center", (cX - 20, cY - 20),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-            # show the image
-        #cv2.imshow("closed", closed)
+            if cv2.contourArea(c) > d['Cnt thresh']:
+                # M = cv2.moments(c)
+                # cX = int(M["m10"] / M["m00"])
+                # cY = int(M["m01"] / M["m00"])
+                # draw the contour and center of the shape on the image
+                #cv2.drawContours(view, [c], -1, (0, 255, 0), 2) regular draw
+                #cv2.circle(view, (cX, cY), 7, (0, 255, 0), -1)
+                #cv2.putText(view, f"center", (cX - 20, cY - 20),
+                #cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                #cv2.imshow('cnts', view)
+                stencil = np.ones(view.shape).astype(view.dtype)
+                view = cv2.bitwise_not(view)
+                cv2.fillPoly(stencil, [c], 255)
+                result = cv2.bitwise_and(view, stencil)
+        #self.generateDataSet(result)
+        #return closed to view dataset
         return closed
 
          
@@ -111,11 +117,11 @@ class suspectAnalyser:
                 suspect_bgr = cv2.resize(suspect_bgr, (self.width, self.height), interpolation=cv2.INTER_CUBIC)
                 suspect = self.getInner(suspect_bin, suspect_bgr)
                 cv2.imshow('suspect', suspect)
+                #cv2.imwrite(f"suspects/suspect{datetime.now()}.jpg", suspect)
                 return suspect
                 
             except Exception as e:
                 #couldn't resize or smth
                 print(str(e))
 
-            #self.suspects.append(suspect_bgr)
            

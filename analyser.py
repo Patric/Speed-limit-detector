@@ -17,8 +17,8 @@ class analyser:
 
 
     BGR_frame = 0
-    rmask = 0
-    rmask_copy = 0
+    #rmask = 0
+    #rmask_copy = 0
     bin_mask = 0
     suspects = list()
     
@@ -63,10 +63,13 @@ class analyser:
 
     #Private methods
     def __resizeFrame(self, frame, scale):
-        width = int(frame.shape[1] * scale / 100)
-        height = int(frame.shape[0] * scale / 100)
-        return cv2.resize(frame, (self.width, self.height))
-   
+        try:
+            width = int(frame.shape[1] * scale / 100)
+            height = int(frame.shape[0] * scale / 100)
+            return cv2.resize(frame, (self.width, self.height))
+        except Exception as e:
+                #couldn't resize or smth
+                print(str(e))
 
     def showFAWTrackbars(self):
         self.frame_analysys_winname = "FAW settings window"
@@ -139,13 +142,14 @@ class analyser:
         red_in_range_2 = cv2.inRange(frame, (d['H2 min'], d['S2 min'], d['V2 min']), (d['H2 max'], d['S2 max'] ,d['V2 max']))
         red_ranges_combined = cv2.bitwise_or(red_in_range_1, red_in_range_2)
 
-        self.rmask = cv2.bitwise_and(self.BGR_frame, self.BGR_frame, mask = red_ranges_combined)
+        #self.rmask = cv2.bitwise_and(self.BGR_frame, self.BGR_frame, mask = red_ranges_combined)
         
 
         red_opened = cv2.morphologyEx(red_ranges_combined, cv2.MORPH_OPEN, (d['open kernel'], d['open kernel']), iterations=d['open i'])
         red_closed = cv2.morphologyEx(red_opened, cv2.MORPH_CLOSE, (d['close kernel'], d['close kernel']), iterations=d['close i'])
         self.bin_mask = red_closed
-        self.rmask_copy = cv2.bitwise_and(self.BGR_frame, self.BGR_frame, mask = red_closed)
+        self.bin_mask = cv2.cvtColor(self.bin_mask, cv2.COLOR_GRAY2BGR)
+        #self.rmask_copy = cv2.bitwise_and(self.BGR_frame, self.BGR_frame, mask = red_closed)
         return red_closed
 
     #Hough tranfsorm
@@ -168,28 +172,31 @@ class analyser:
         cv2.circle(frame_to_mark, (x, y), r, (0, 255, 0), 2)
         cv2.rectangle(frame_to_mark, (x - 2, y - 2), (x + 2, y + 2), (0, 128, 255), -1)
 
-    
-    def findSuspect(self, circles):
+    def cropSuspect(self, frame, x, y, r):
+        suspect = frame[y-int(1.0*r):y+int(1.0*r), x-int(1.0*r):x+int(1.0*r)]
+        return suspect
+
+    def analyseCircles(self, circles):
         #drawing circles
-     
-       
         if circles is not None:
             circles = np.round(circles[0, :]).astype("int")
             for (x, y, r) in circles:
+                #acceleration
+                #discard close to each other cirles
+
                 #Cutting prohibition sign from the background
                 #suspect consists of red mask and a BGR frame
-                suspect_bin = self.bin_mask[y-int(1.3*r):y+int(1.3*r), x-int(1.1*r):x+int(1.5*r)]
-                suspect_bgr = self.BGR_frame[y-int(1.3*r):y+int(1.3*r), x-int(1.1*r):x+int(1.5*r)]
+                suspect_bin = self.cropSuspect(self.bin_mask, x, y, r)
+                suspect_bgr = self.cropSuspect(self.BGR_frame, x, y, r)
                 self.suspectAnalyser.analyseSuspect(suspect_bgr, suspect_bin)
-
                 #Draw on redmask
-                #self.__markFrame(self.rmask_copy, x, y, r)
+                self.__markFrame(self.bin_mask, x, y, r)
                 #print("detected circle")#for debug
     
   
    
     def showFrames(self):
-        cv2.imshow('only_red', self.rmask_copy)
+        cv2.imshow('only_red', self.bin_mask)
         cv2.imshow('frame', self.BGR_frame)
 
     
