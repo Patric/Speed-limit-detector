@@ -1,7 +1,7 @@
 from video import *
 from analyser import *
 import keyboard
-import imutils
+
 
 
 
@@ -12,11 +12,9 @@ if cap is not False:
     frame = cap.read()
     pause = False
     analyser = analyser(cap.read()[1])
-    #analyser.showFAWTrackbars()
-  
+    analyser.showFAWTrackbars()
+    analyser.suspectAnalyser.showTrackbars("GI settings")
     while(cap.isOpened()): 
-        d = analyser.getFAWTrackbarValues()
-
         if keyboard.is_pressed("d"):
             pause = True
         if keyboard.is_pressed("s"):
@@ -32,10 +30,10 @@ if cap is not False:
         #feature extraction
         only_red = analyser.rMask(processed_frame)
         detected_circles = analyser.houghCircles(only_red)
-        analyser.cutSuspect(detected_circles)
+        analyser.findSuspect(detected_circles)
         analyser.showFrames()
-       
-        if cv2.waitKey(d['Delay']) & 0xFF == ord('q'):
+        
+        if cv2.waitKey(analyser.getFAWTrackbarValues()["Delay"]) & 0xFF == ord('q'):
             break
 
    
