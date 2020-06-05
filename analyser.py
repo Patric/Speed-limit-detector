@@ -21,7 +21,7 @@ class analyser:
     #rmask_copy = 0
     bin_mask = 0
     suspects = list()
-    
+    counter = 0
 
     def __init__(self, frame):
         #reading first frame to get setting for preprocessing
@@ -171,28 +171,35 @@ class analyser:
     def __markFrame(self, frame_to_mark, x, y, r):
         cv2.circle(frame_to_mark, (x, y), r, (0, 255, 0), 2)
         cv2.rectangle(frame_to_mark, (x - 2, y - 2), (x + 2, y + 2), (0, 128, 255), -1)
-
+        return frame_to_mark
+        
     def cropSuspect(self, frame, x, y, r):
         suspect = frame[y-int(1.0*r):y+int(1.0*r), x-int(1.0*r):x+int(1.0*r)]
         return suspect
 
     def analyseCircles(self, circles):
         #drawing circles
-        if circles is not None:
-            circles = np.round(circles[0, :]).astype("int")
-            for (x, y, r) in circles:
-                #acceleration
-                #discard close to each other cirles
 
-                #Cutting prohibition sign from the background
-                #suspect consists of red mask and a BGR frame
-                suspect_bin = self.cropSuspect(self.bin_mask, x, y, r)
-                suspect_bgr = self.cropSuspect(self.BGR_frame, x, y, r)
-                self.suspectAnalyser.analyseSuspect(suspect_bgr, suspect_bin)
-                #Draw on redmask
-                self.__markFrame(self.bin_mask, x, y, r)
+        if self.counter == 10:
+            if circles is not None:
+                circles = np.round(circles[0, :]).astype("int")
+                prediction = None
+                for (x, y, r) in circles:
+                    #acceleration
+                    #discard close to each other cirles
+
+                    #Cutting prohibition sign from the background
+                    #suspect consists of red mask and a BGR frame
+                    suspect_bin = self.cropSuspect(self.bin_mask, x, y, r)
+                    suspect_bgr = self.cropSuspect(self.BGR_frame, x, y, r)
+                    prediction = self.suspectAnalyser.analyseSuspect(suspect_bgr, suspect_bin)
+                    
+                    #Draw on redmasl
+                    self.__markFrame(self.bin_mask, x, y, r)
+                    self.counter = 0
                 #print("detected circle")#for debug
-    
+        else:
+            self.counter = self.counter + 1
   
    
     def showFrames(self):

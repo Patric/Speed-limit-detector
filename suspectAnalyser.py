@@ -1,7 +1,8 @@
 from analyser import *
 import imutils
 from datetime import datetime
-
+from speedLNetManager import *
+import pathlib
 def callback(foo):
         pass
 
@@ -12,6 +13,7 @@ class suspectAnalyser:
     width = 0
     height = 0
     cntr = 0
+    neuralAnalyser = 0
 
     def __init__(self):
         d = {
@@ -33,10 +35,26 @@ class suspectAnalyser:
             'open i': (10, 60),
             'close i': (10, 60),
             'Cnt thresh' : (1240, 10000),
+            'Cnt thresh 2' : (4000, 10000)
         }
         get_inner_settings = {"GI settings" : d}
         self.settings.append(get_inner_settings)
-     
+
+        batchsize = 1
+        iteration = 4
+        PATH = './sld_net.pth'
+        self.neuralAnalyser = speedLNetManager(batchsize)
+        
+
+
+        self.neuralAnalyser.loadNet(PATH)
+        
+        # for param in self.neuralAnalyser.net.features.parameters():
+        #     param.requires_grad = False
+
+        self.neuralAnalyser.net.eval()
+
+       
 
     def showTrackbars(self, setting_to_use):
         cv2.namedWindow(setting_to_use, cv2.WINDOW_NORMAL)
@@ -64,7 +82,7 @@ class suspectAnalyser:
         self.cntr += 1
 
 
-    def getInner(self, suspect_bin, suspect_bgr):
+    def getLabel(self, suspect_bin, suspect_bgr):
         
         d = self.getTrackbarValues("GI settings")
         suspect_bgr = cv2.addWeighted(suspect_bgr, d['contrast']*0.001, suspect_bgr, d['brightness'] *0.001, d['gamma']-100)
@@ -79,31 +97,77 @@ class suspectAnalyser:
         closed = cv2.morphologyEx(opened, cv2.MORPH_CLOSE, (d['close kernel'], d['close kernel']), iterations=d['close i'])
     
         
-        cnts = cv2.findContours(closed.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
-
+        cnts, hierarchy = cv2.findContours(closed.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        #cnts = imutils.grab_contours(cnts)
+        
+        hierarchy = hierarchy[0]
         view = closed
-    
+     
+        cv2.imshow("closed", closed)
         #loop over the contours
-        for c in cnts:
-            # compute the center of the contour
-            if cv2.contourArea(c) > d['Cnt thresh']:
+        for component in zip(cnts, hierarchy):
+            c = component[0]
+
+            if cv2.contourArea(c) > d['Cnt thresh'] and  cv2.contourArea(c) < d['Cnt thresh 2']:
                 # M = cv2.moments(c)
                 # cX = int(M["m10"] / M["m00"])
                 # cY = int(M["m01"] / M["m00"])
                 # draw the contour and center of the shape on the image
-                #cv2.drawContours(view, [c], -1, (0, 255, 0), 2) regular draw
+                
                 #cv2.circle(view, (cX, cY), 7, (0, 255, 0), -1)
                 #cv2.putText(view, f"center", (cX - 20, cY - 20),
                 #cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 #cv2.imshow('cnts', view)
-                stencil = np.ones(view.shape).astype(view.dtype)
-                view = cv2.bitwise_not(view)
-                cv2.fillPoly(stencil, [c], 255)
-                result = cv2.bitwise_and(view, stencil)
+                cipher = np.zeros(view.shape).astype(view.dtype)
+
+
+                cipher = cv2.fillPoly(cipher, [c], 255)
+                cipher = cv2.bitwise_not(cipher)
+                
+                # result2 = cv2.cvtColor(cipher, cv2.COLOR_GRAY2BGR)
+                # cv2.drawContours(result2, [c], -1, (0, 255, 0), 2)
+                # cv2.imshow('suspect', result2)
+
+                # cv2.waitKey(0)
+
+
+                toEvaluate = cv2.resize(cipher, (28, 28))
+                #label = self.neuralAnalyser.evaluate(toEvaluate)
+                cv2.imshow("eval", toEvaluate)
+
+
+                #print(label)
+                #x,y,w,h = cv2.boundingRect(c)
+                #cv2.rectangle(img,(x,y),(x+w,y+h),(0,255,0),2)
         #self.generateDataSet(result)
         #return closed to view dataset
-        return closed
+        
+       
+        # if prediction != "unidentified" and prediction != None:
+        #             cv2.putText(result, f"LIMIT {prediction} km/h", (x - 400, y - 40),
+        #             cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 2)
+                  
+        # image = toEvaluate
+        # cv2.imshow("LOL", image)
+        # image = image[np.newaxis,:]
+        # image = image[np.newaxis,:]
+     
+        # image = torch.from_numpy(image)
+        # image = image.float()
+        # classes1 = ('30', '40', '70', 'unidenqtified')
+        # image.to(self.neuralAnalyser.cuda)
+
+        # output = self.neuralAnalyser.net(image)
+        # print(torch.argmax(output))
+        #probs, classes = output.topk(1, dim=1)
+
+        #print("The model is ", probs.item()*100, "% certain that the image has a predicted class of ", classes1[classes.item()] )
+      
+       
+        #toEvaluate = cv2.bitwise_not(toEvaluate)
+        
+        label = "mock"
+        return label
 
          
     def analyseSuspect(self, suspect_bgr, suspect_bin):
@@ -115,10 +179,10 @@ class suspectAnalyser:
                 self.height = suspect_bin.shape[1]*5
                 suspect_bin = cv2.resize(suspect_bin, (self.width, self.height), interpolation=cv2.INTER_CUBIC)
                 suspect_bgr = cv2.resize(suspect_bgr, (self.width, self.height), interpolation=cv2.INTER_CUBIC)
-                suspect = self.getInner(suspect_bin, suspect_bgr)
-                cv2.imshow('suspect', suspect)
+                label = self.getLabel(suspect_bin, suspect_bgr)
+                
                 #cv2.imwrite(f"suspects/suspect{datetime.now()}.jpg", suspect)
-                return suspect
+                return label
                 
             except Exception as e:
                 #couldn't resize or smth

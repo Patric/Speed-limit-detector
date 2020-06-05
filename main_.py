@@ -24,7 +24,7 @@ if cap is not False:
         if pause:
             pass
         else:
-            ret, frame = cap.read()
+            rqet, frame = cap.read()
             processed_frame = analyser.preprocessing(frame)
 
         #feature extractions
