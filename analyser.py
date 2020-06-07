@@ -15,6 +15,10 @@ class analyser:
     frame_analysys_winname = "Disabled"#disabled by default
     suspectAnalyser = suspectAnalyser()
 
+    current_limit = None
+    prediction = None
+
+    momentary_predictions = list()
 
     BGR_frame = 0
     #rmask = 0
@@ -168,38 +172,72 @@ class analyser:
     
         return circles
 
-    def __markFrame(self, frame_to_mark, x, y, r):
+    def __markFrame(self, frame_to_mark, x, y, r, prediction):
         cv2.circle(frame_to_mark, (x, y), r, (0, 255, 0), 2)
         cv2.rectangle(frame_to_mark, (x - 2, y - 2), (x + 2, y + 2), (0, 128, 255), -1)
+        # if prediction != None:
+        #     cv2.putText(frame_to_mark, f"LIMIT {prediction} km/h", (x - 400, y - 40),
+        #             cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 2)
+
         return frame_to_mark
         
+    def showLimit(self):
+        
+        if self.current_limit != self.prediction and self.prediction != None:
+            self.current_limit = self.prediction
+        if self.current_limit != None:
+            cv2.putText(self.BGR_frame, f"CURRENT SPEED LIMIT: {self.current_limit} km/h",
+            (0, 0 + int(self.BGR_frame.shape[0])-20),
+            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+
     def cropSuspect(self, frame, x, y, r):
         suspect = frame[y-int(1.0*r):y+int(1.0*r), x-int(1.0*r):x+int(1.0*r)]
         return suspect
 
+
+    def most_frequent(self, numbers): 
+        counter = 0
+        num = numbers[0]
+      
+        for i in numbers: 
+            curr_frequency = numbers.count(i) 
+            if(curr_frequency> counter): 
+                counter = curr_frequency 
+                num = i 
+    
+        return num 
+
     def analyseCircles(self, circles):
         #drawing circles
+        self.counter += 1
+        if circles is not None:
+            circles = np.round(circles[0, :]).astype("int")
+            predictions = list()
+            for (x, y, r) in circles:
+                #acceleration
+                #discard close to each other cirles
 
-        if self.counter == 10:
-            if circles is not None:
-                circles = np.round(circles[0, :]).astype("int")
-                prediction = None
-                for (x, y, r) in circles:
-                    #acceleration
-                    #discard close to each other cirles
-
-                    #Cutting prohibition sign from the background
-                    #suspect consists of red mask and a BGR frame
-                    suspect_bin = self.cropSuspect(self.bin_mask, x, y, r)
-                    suspect_bgr = self.cropSuspect(self.BGR_frame, x, y, r)
-                    prediction = self.suspectAnalyser.analyseSuspect(suspect_bgr, suspect_bin)
-                    
-                    #Draw on redmasl
-                    self.__markFrame(self.bin_mask, x, y, r)
-                    self.counter = 0
-                #print("detected circle")#for debug
-        else:
-            self.counter = self.counter + 1
+                #Cutting prohibition sign from the background
+                #suspect consists of red mask and a BGR frame
+                suspect_bin = self.cropSuspect(self.bin_mask, x, y, r)
+                suspect_bgr = self.cropSuspect(self.BGR_frame, x, y, r)
+                prediction = self.suspectAnalyser.analyseSuspect(suspect_bgr, suspect_bin)
+                predictions.append(prediction)
+       
+                #Draw on redmask
+            self.prediction = self.most_frequent(predictions)
+            if self.prediction != None:
+                self.momentary_predictions.append(self.prediction)
+                #print(f"CURRENT PRED SET:{self.momentary_predictions}")
+                self.prediction = self.most_frequent(self.momentary_predictions)
+                self.__markFrame(self.bin_mask, x, y, r, prediction)
+        #compares output to output from last 120 frames
+        if self.counter == 120:
+            self.momentary_predictions = list()
+            self.counter = 0
+            #print("detected circle")#for debug
+        
   
    
     def showFrames(self):

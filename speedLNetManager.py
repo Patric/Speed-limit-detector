@@ -28,34 +28,62 @@ class speedLNetManager:
 
     # all, training, testing
     def useMNIST(self, datatype):
-        self.classes('0', '1', '2','3', '4','5','6','7','8','9')
-
-    def loadData(self, datatype):
-        self.classes = ('30', '40', '70', 'unidentified')
-
+        self.classes = ('0','1', '2','3', '4','5','6','7','8','9')
         transform = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),
-        transforms.Resize(size=(256,256), interpolation = 1),
-        transforms.ToTensor()])
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))])
 
         if datatype == "training":
-            trainset = torchvision.datasets.ImageFolder('training/', transform = transform)
+            trainset = torchvision.datasets.MNIST('/MNIST_train', download=True, train=True, transform=transform)
             self.trainloader = torch.utils.data.DataLoader(trainset, batch_size = self.batchsize, shuffle = True, 
                                                         num_workers = 0)
             return self.trainloader
 
         elif datatype == "testing":
-            testset = torchvision.datasets.ImageFolder('test/', transform = transform)
+            testset = torchvision.datasets.MNIST('/MNIST_test', download=True, train=False, transform=transform)
             self.testloader = torch.utils.data.DataLoader(testset, batch_size = self.batchsize, shuffle = True, 
                                                         num_workers = 0)
             return self.testloader
 
 
         elif datatype == "all":
-            trainset = torchvision.datasets.ImageFolder('training/', transform = transform)
+            trainset = torchvision.datasets.MNIST('/MNIST_train', download=True, train=True, transform=transform)
             self.trainloader = torch.utils.data.DataLoader(trainset, batch_size = self.batchsize, shuffle = True, 
                                                         num_workers = 0)
-            testset = torchvision.datasets.ImageFolder('test/', transform = transform)
+            testset = torchvision.datasets.MNIST('/MNIST_test', download=True, train=False, transform=transform)
+            self.testloader = torch.utils.data.DataLoader(testset, batch_size = self.batchsize, shuffle = True, 
+                                                        num_workers = 0)
+
+            return (self.trainloader, self.testloader)
+
+
+
+    def loadData(self, datatype):
+        self.classes = ('0', '3', '4', '7', 'unidentified')
+
+        transform = transforms.Compose([
+        transforms.Grayscale(num_output_channels=1),
+        transforms.Resize(size=(32,32), interpolation = 1),
+        transforms.ToTensor()])
+
+        if datatype == "training":
+            trainset = torchvision.datasets.ImageFolder('training_32/', transform = transform)
+            self.trainloader = torch.utils.data.DataLoader(trainset, batch_size = self.batchsize, shuffle = True, 
+                                                        num_workers = 0)
+            return self.trainloader
+
+        elif datatype == "testing":
+            testset = torchvision.datasets.ImageFolder('test_32/', transform = transform)
+            self.testloader = torch.utils.data.DataLoader(testset, batch_size = self.batchsize, shuffle = True, 
+                                                        num_workers = 0)
+            return self.testloader
+
+
+        elif datatype == "all":
+            trainset = torchvision.datasets.ImageFolder('training_32/', transform = transform)
+            self.trainloader = torch.utils.data.DataLoader(trainset, batch_size = self.batchsize, shuffle = True, 
+                                                        num_workers = 0)
+            testset = torchvision.datasets.ImageFolder('test_32/', transform = transform)
             self.testloader = torch.utils.data.DataLoader(testset, batch_size = self.batchsize, shuffle = True, 
                                                         num_workers = 0)     
 
@@ -70,14 +98,14 @@ class speedLNetManager:
         #criterion = nn.NLLLoss()
         optimiser = optim.SGD(self.net.parameters(), lr = 0.001, momentum = 0.9)
 
+        #self.useMNIST("training")
         self.loadData("training")
-
         for epoch in range(iterations):
             running_loss = 0.0
             for i, data in enumerate(self.trainloader, 0):
                 # get the inputs; data is a list of [inputs, labels]
                 inputs, labels = data[0].to(self.cuda), data[1].to(self.cuda)
-        
+             
                 # zero the parameter gradients
                 optimiser.zero_grad()
                 # forward + backward + optimise
@@ -108,30 +136,28 @@ class speedLNetManager:
         image.to(self.cuda)
         output = self.net(image)
         #classes = torch.nn.functional.softmax(output)
-        classes = torch.argmax(output)
+        label = torch.argmax(output)
+     
         #print(f"Torch max{torch.nn.functional.softmax(output)}")
         #print(f"Torch exp{torch.exp(output)}")
       
-        return classes
+        return label
 
 
     def evaluate(self, image):
         image = image[np.newaxis,:]
-        image = image[np.newaxis,:]
-    
+        #image = image[np.newaxis,:]
+
         # converting to PIL image
         # image = torch.FloatTensor(1, image.shape[1], image.shape[0])
         # image = Ft.to_pil_image(image)
-
-        # transform = transforms.Compose([
-        # transforms.Grayscale(num_output_channels=1),
-        # transforms.Resize(size=(256,256), interpolation = 1),
-        # transforms.ToTensor()])
-
+        
         image = torch.from_numpy(image)
+        image = image.unsqueeze(0)
         image = image.float()
         top_class = self.predict(image)
-        self.classes = ('30', '40', '70', 'unidentified')
+        #self.classes = ('0','1', '2','3', '4','5','6','7','8','9')
+        self.classes = ('0', '3', '4', '7', 'unidentified')
 
         #print(f"TOP CLASS: {self.classes[top_class]}")
         # if top_class != 0:
@@ -139,7 +165,9 @@ class speedLNetManager:
         return self.classes[top_class]
 
     def showStats(self):
-        self.loadData("testing")
+        self.classes = ('0','1', '2','3', '4','5','6','7','8','9')
+        #self.loadData("testing")
+        self.useMNIST("testing")
         dataiter = iter(self.testloader)
         images, labels = dataiter.next()
 
@@ -151,7 +179,7 @@ class speedLNetManager:
         #self.net = speedLNet()
         #net.load_state_dict(torch.load(PATH))
         outputs = self.net(images)
-
+        print(torch.max(outputs, 1))
         #Max certainty
         _, predicted = torch.max(outputs, 1)
         print('Predicted: ', ' '.join('%5s' %  self.classes[predicted[j]] for j in range(self.batchsize)))
@@ -179,7 +207,6 @@ class speedLNetManager:
  
         with torch.no_grad():
             for data in self.testloader:
-                print(f"testloader {data}")
                 images, labels = data
                 outputs = self.net(images)
                 _, predicted = torch.max(outputs, 1)
@@ -188,7 +215,7 @@ class speedLNetManager:
                 # error since sample number % batchsie != 0
                 for i in range(self.batchsize):
                     label = labels[i]
-                    class_correct[label] += c[i].item()
+                    class_correct[label] += c.item()
                     class_total[label] += 1
                 
         for i in range(len(self.classes)):
@@ -198,10 +225,11 @@ class speedLNetManager:
 
 
 if __name__ == "__main__":
-    batchsize = 4
+    batchsize = 1
     iterations = 4
-    PATH = './sld_net.pth'
+    PATH = './sld_my_net.pth'
     trainer = speedLNetManager(batchsize)
-    #trainer.trainNet(batchsize, iterations, PATH)
-    trainer.loadNet(PATH)
-    trainer.showStats()
+    trainer.trainNet(batchsize, iterations, PATH)
+    #trainer.loadNet(PATH)
+    #trainer.useMNIST("testing")
+    #trainer.showStats()

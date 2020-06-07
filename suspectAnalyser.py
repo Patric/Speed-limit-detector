@@ -42,7 +42,7 @@ class suspectAnalyser:
 
         batchsize = 1
         iteration = 4
-        PATH = './sld_net.pth'
+        PATH = './sld_my_net.pth'
         self.neuralAnalyser = speedLNetManager(batchsize)
         
 
@@ -78,11 +78,11 @@ class suspectAnalyser:
                     return d
 
     def generateDataSet(self, data):
-        cv2.imwrite(f'suspects/suspect_{self.cntr}.jpg', data) 
+        cv2.imwrite(f'dataset_32x32/suspect_{self.cntr}.jpg', data) 
         self.cntr += 1
 
 
-    def getLabel(self, suspect_bin, suspect_bgr):
+    def getCipher(self, suspect_bin, suspect_bgr):
         
         d = self.getTrackbarValues("GI settings")
         suspect_bgr = cv2.addWeighted(suspect_bgr, d['contrast']*0.001, suspect_bgr, d['brightness'] *0.001, d['gamma']-100)
@@ -105,6 +105,7 @@ class suspectAnalyser:
      
         cv2.imshow("closed", closed)
         #loop over the contours
+        predictions = list()
         for component in zip(cnts, hierarchy):
             c = component[0]
 
@@ -129,17 +130,31 @@ class suspectAnalyser:
                 # cv2.imshow('suspect', result2)
 
                 # cv2.waitKey(0)
+                x,y,w,h = cv2.boundingRect(c)
+               
 
-
-                toEvaluate = cv2.resize(cipher, (28, 28))
-                #label = self.neuralAnalyser.evaluate(toEvaluate)
+             
+                cipher = cipher[y:y+h, x:x+h]
+        
+                kernel = np.ones((3,3),np.uint8)
+                cipher = cv2.dilate(cipher,kernel,iterations = 4)
+                
+         
+                toEvaluate = cv2.resize(cipher, (32, 32))
+                toEvaluate = cv2.bitwise_not(toEvaluate)
+                #self.generateDataSet(toEvaluate)
+                prediction = self.neuralAnalyser.evaluate(toEvaluate)
                 cv2.imshow("eval", toEvaluate)
-
-
+                # print(prediction)
+                # cv2.waitKey(0)
+                
+                if prediction != "unidentified":
+                    predictions.append(prediction)
+       
                 #print(label)
                 #x,y,w,h = cv2.boundingRect(c)
                 #cv2.rectangle(img,(x,y),(x+w,y+h),(0,255,0),2)
-        #self.generateDataSet(result)
+        #
         #return closed to view dataset
         
        
@@ -165,27 +180,43 @@ class suspectAnalyser:
       
        
         #toEvaluate = cv2.bitwise_not(toEvaluate)
-        
-        label = "mock"
-        return label
+    
+        return predictions
 
-         
+    def analyseCiphers(self, predictions):
+        print(predictions)
+        output = list()
+        str_o = ""
+        for prediction in predictions:
+            if prediction != '0':
+                output.insert(0, prediction)
+            else:
+                output.append(prediction)
+        for e in output:
+            str_o += e
+        return str_o
+
+
+  
+
     def analyseSuspect(self, suspect_bgr, suspect_bin):
         #40px is minimum value for a shape to be taken into consideration. Used to avoid zero sizes after int rounding
       
         if(suspect_bin.shape[0] > 40 and suspect_bin.shape[0] > 40):
-            try:
-                self.width = suspect_bin.shape[0]*5
-                self.height = suspect_bin.shape[1]*5
-                suspect_bin = cv2.resize(suspect_bin, (self.width, self.height), interpolation=cv2.INTER_CUBIC)
-                suspect_bgr = cv2.resize(suspect_bgr, (self.width, self.height), interpolation=cv2.INTER_CUBIC)
-                label = self.getLabel(suspect_bin, suspect_bgr)
-                
+            self.width = suspect_bin.shape[0]*5
+            self.height = suspect_bin.shape[1]*5
+            suspect_bin = cv2.resize(suspect_bin, (self.width, self.height), interpolation=cv2.INTER_CUBIC)
+            suspect_bgr = cv2.resize(suspect_bgr, (self.width, self.height), interpolation=cv2.INTER_CUBIC)
+            ciphers = self.getCipher(suspect_bin, suspect_bgr)
+            if len(ciphers) > 0:
+                number = self.analyseCiphers(ciphers)
+                if int(number) % 5 == 0 and int(number) <= 140 and int(number) > 0:
                 #cv2.imwrite(f"suspects/suspect{datetime.now()}.jpg", suspect)
-                return label
-                
-            except Exception as e:
-                #couldn't resize or smth
-                print(str(e))
+                    return number
+            # try:
+      
+            # except Exception as e:
+            #     #couldn't resize or smth
+            #     print(str(e))
 
            
